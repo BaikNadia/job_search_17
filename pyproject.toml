@@ -8,7 +8,8 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "requests (>=2.32.3,<3.0.0)"
+    "requests (>=2.32.3,<3.0.0)",
+    "pytest (>=8.4.0,<9.0.0)"
 ]
 
 
@@ -21,6 +22,10 @@ flake8 = "^7.2.0"
 mypy = "^1.16.0"
 black = "^25.1.0"
 isort = "^6.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.0"
 
 [tool.black]
 # Максимальная длина строки
