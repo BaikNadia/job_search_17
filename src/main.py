@@ -13,19 +13,35 @@ def filter_vacancies(vacancies: List[Vacancy], keywords: List[str]) -> List[Vaca
     ]
 
 
-def get_vacancies_by_salary(vacancies: List[Vacancy], salary_range: str) -> List[Vacancy]:
-    """Фильтрует вакансии по зарплате"""
-    if not salary_range:
-        return vacancies
+# def get_vacancies_by_salary(vacancies: List[Vacancy], salary_range: str) -> List[Vacancy]:
+#     """Фильтрует вакансии по зарплате"""
+#     if not salary_range:
+#         return vacancies
+#     try:
+#         min_sal, max_sal = map(float, salary_range.split("-"))
+#         return [v for v in vacancies if min_sal <= v.salary <= max_sal]
+#     except ValueError:
+#         return []
+
+def get_vacancies_by_salary(vacancies: List[Vacancy], min_salary: str) -> List[Vacancy]:
+    """Фильтрует вакансии, где зарплата >= указанной суммы"""
+    if not min_salary:
+        return vacancies  # Если порог не задан, возвращаем всё
+
     try:
-        min_sal, max_sal = map(float, salary_range.split("-"))
-        return [v for v in vacancies if min_sal <= v.salary <= max_sal]
+        threshold = float(min_salary.strip())
+        return [v for v in vacancies if v.salary >= threshold and v.salary > 0]
     except ValueError:
+        print("Неверный формат зарплаты. Используйте число, например: 100000")
         return []
 
 
+# def sort_vacancies(vacancies: List[Vacancy]) -> List[Vacancy]:
+#     """Сортирует вакансии по зарплате"""
+#     return sorted(vacancies, key=lambda v: v.salary, reverse=True)
+
 def sort_vacancies(vacancies: List[Vacancy]) -> List[Vacancy]:
-    """Сортирует вакансии по зарплате"""
+    """Сортирует вакансии по убыванию зарплаты"""
     return sorted(vacancies, key=lambda v: v.salary, reverse=True)
 
 
@@ -70,6 +86,7 @@ def user_interaction():
     top_vacancies = get_top_vacancies(sorted_vacancies, top_n)
 
     print_vacancies(top_vacancies)
+
 
 
 if __name__ == "__main__":
