@@ -1,15 +1,16 @@
-from typing import Optional, List, Dict
-
+from typing import Optional, List, Dict, Union
 
 
 class Vacancy:
     __slots__ = ["_title", "_link", "_salary", "_description"]
 
-    def __init__(self, title: str, link: str, salary: Optional[str], description: str):
+    def __init__(self, title: str, link: str, salary: Optional[Union[str, Dict]], description: str):
         self._title = self._validate_title(title)
         self._link = self._validate_link(link)
         self._description = description
         self._salary = self._parse_salary(salary)
+
+
 
     @staticmethod
     def _validate_title(title: str) -> str:
@@ -25,32 +26,78 @@ class Vacancy:
             raise ValueError("Ссылка должна начинаться с http:// или https://")
         return link
 
-    @staticmethod
-    def _parse_salary(salary: Optional[str]) -> float:
-        """Обрабатывает зарплату, если она указана"""
-        if not salary:
-            return 0.0
-        try:
-            cleaned = salary.replace("\u00a0", "").replace("руб.", "").strip()
-            if "-" in cleaned:
-                min_salary, max_salary = map(float, cleaned.split("-"))
-                return max_salary
-            return float(cleaned)
-        except (ValueError, TypeError):
-            return 0.0
 
     @staticmethod
-    def cast_to_object_list(data: List[Dict]) -> List["Vacancy"]:
+    def _parse_salary(salary: Optional[Union[str, Dict]]) -> float:
+        """Обрабатывает зарплату из разных форматов и возвращает минимальное значение или 0"""
+        if not salary:
+            return 0.0
+
+        # Случай: salary — словарь с 'from' и 'to'
+        if isinstance(salary, dict):
+            min_salary = salary.get("from")
+            max_salary = salary.get("to")
+            currency = salary.get("currency", "")
+
+            if min_salary is not None:
+                return float(min_salary)
+            elif max_salary is not None:
+                return float(max_salary)  # Можно использовать `to` как fallback
+            else:
+                return 0.0
+
+        # Случай: salary — строка
+        if isinstance(salary, str):
+            cleaned = salary.replace("\u00a0", "").strip()
+            if "от" in cleaned:
+                try:
+                    return float(cleaned.replace("от", "").strip().split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+            elif "до" in cleaned:
+                return 0.0  # Зарплата "до" — не подходит для фильтрации по минимуму
+            elif "-" in cleaned:
+                try:
+                    return float(cleaned.split("-")[0].strip().split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+            else:
+                try:
+                    return float(cleaned.split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+
+        return 0.0
+
+
+    @classmethod
+    def cast_to_object_list(cls, data: List[Dict]) -> List["Vacancy"]:
         """Преобразует сырые данные в список объектов Vacancy"""
         vacancies = []
+
         for item in data:
-            title = item["name"]
-            link = item["alternate_url"]
-            salary = item.get("salary")
-            salary_str = f"{salary['from']}-{salary['to']} {salary['currency']}" if salary else None
-            description = item["snippet"]["requirement"] or item["snippet"]["responsibility"] or "Описание отсутствует"
-            vacancies.append(Vacancy(title, link, salary_str, description))
+            title = item.get("name", "Без названия")
+            link = item.get("alternate_url", "Ссылка отсутствует")
+
+            salary = item.get("salary")  # Это словарь или None
+            min_salary = None
+            if isinstance(salary, dict):
+                min_salary = salary.get("from") or salary.get("to")  # Можно использовать 'to' как fallback
+            elif isinstance(salary, str):
+                min_salary = salary  # Если пришла строка
+
+            description = item.get("snippet", {})
+            requirement = description.get("requirement", "") or description.get("responsibility",
+                                                                                "") or "Описание отсутствует"
+            if min_salary:
+                vacancies.append(cls(title, link, min_salary, requirement))
+            else:
+                # Вакансии без зарплаты не добавляются, если фильтруем по min_salary
+                pass
+
         return vacancies
+
+
 
     @property
     def title(self) -> str:
