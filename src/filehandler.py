@@ -63,9 +63,21 @@ class JSONSaver(FileHandler):
         data = [item for item in data if item["link"] != vacancy.link]
         self._save_data(data)
 
+    # def _load_data(self) -> List[Dict]:
+    #     with open(self._filename, "r", encoding="utf-8") as file:
+    #         return json.load(file)
+
     def _load_data(self) -> List[Dict]:
-        with open(self._filename, "r", encoding="utf-8") as file:
-            return json.load(file)
+        """Загружает данные из файла. Если файл пустой или поврежден — возвращает пустой список"""
+        try:
+            with open(self._filename, "r", encoding="utf-8") as file:
+                data = json.load(file)
+                if not isinstance(data, list):
+                    data = []
+        except (json.JSONDecodeError, FileNotFoundError):
+            data = []
+
+        return data
 
     def _save_data(self, data: List[Dict]) -> None:
         with open(self._filename, "w", encoding="utf-8") as file:
