@@ -18,7 +18,7 @@ class VacancyAPI(ABC):
 
 class HeadHunterAPI(VacancyAPI):
     def __init__(self):
-        self._base_url = "https://api.hh.ru/"
+        self._base_url = "https://api.hh.ru/vacancies"
         self._headers = {"User-Agent": "HH-User-Agent"}
         self._params = {"text": "", "per_page": 100}
         self._connected = False
