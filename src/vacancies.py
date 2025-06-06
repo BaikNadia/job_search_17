@@ -10,8 +10,6 @@ class Vacancy:
         self._description = description
         self._salary = self._parse_salary(salary)
 
-
-
     @staticmethod
     def _validate_title(title: str) -> str:
         """Проверяет, что название вакансии не пустое"""
@@ -42,7 +40,7 @@ class Vacancy:
             if min_salary is not None:
                 return float(min_salary)
             elif max_salary is not None:
-                return float(max_salary)  # Можно использовать `to` как fallback
+                return float(max_salary)  # Используем 'to' как fallback
             else:
                 return 0.0
 
@@ -76,28 +74,24 @@ class Vacancy:
         vacancies = []
 
         for item in data:
-            title = item.get("name", "Без названия")
-            link = item.get("alternate_url", "Ссылка отсутствует")
-
-            salary = item.get("salary")  # Это словарь или None
-            min_salary = None
-            if isinstance(salary, dict):
-                min_salary = salary.get("from") or salary.get("to")  # Можно использовать 'to' как fallback
-            elif isinstance(salary, str):
-                min_salary = salary  # Если пришла строка
-
+            title = item.get("name")
+            link = item.get("alternate_url")
+            salary = item.get("salary")
             description = item.get("snippet", {})
-            requirement = description.get("requirement", "") or description.get("responsibility",
-                                                                                "") or "Описание отсутствует"
-            if min_salary:
-                vacancies.append(cls(title, link, min_salary, requirement))
-            else:
-                # Вакансии без зарплаты не добавляются, если фильтруем по min_salary
-                pass
+            requirement = description.get("requirement") or description.get("responsibility") or "Описание отсутствует"
+
+            # Пропускаем вакансию, если title или link пустые
+            if not title or not link:
+                continue  # ✅ Пропускаем некорректные вакансии
+
+            try:
+                vacancies.append(cls(title, link, salary, requirement))
+            except ValueError as e:
+                # Можно логировать или игнорировать
+                print(f"Ошибка при инициализации вакансии: {e}")
+                continue
 
         return vacancies
-
-
 
     @property
     def title(self) -> str:
@@ -121,5 +115,13 @@ class Vacancy:
     def __eq__(self, other: "Vacancy") -> bool:
         return self.salary == other.salary
 
+
     def __str__(self) -> str:
-        return f"{self.title}\nСсылка: {self.link}\nЗарплата: {self.salary or 'Не указана'} руб.\nОписание: {self.description[:100]}..."
+        salary_str = f"{int(self.salary)}" if self.salary != 0 else "Не указана"
+        desc_preview = self.description[:100] + "..." if len(self.description) > 100 else self.description
+        return (
+            f"{self.title}\n"
+            f"Ссылка: {self.link}\n"
+            f"Зарплата: {salary_str} руб.\n"
+            f"Описание: {desc_preview}"
+        )
