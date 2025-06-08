@@ -1,11 +1,10 @@
-from typing import Optional, List, Dict
-
+from typing import Optional, List, Dict, Union
 
 
 class Vacancy:
     __slots__ = ["_title", "_link", "_salary", "_description"]
 
-    def __init__(self, title: str, link: str, salary: Optional[str], description: str):
+    def __init__(self, title: str, link: str, salary: Optional[Union[str, Dict]], description: str):
         self._title = self._validate_title(title)
         self._link = self._validate_link(link)
         self._description = description
@@ -25,31 +24,73 @@ class Vacancy:
             raise ValueError("Ссылка должна начинаться с http:// или https://")
         return link
 
-    @staticmethod
-    def _parse_salary(salary: Optional[str]) -> float:
-        """Обрабатывает зарплату, если она указана"""
-        if not salary:
-            return 0.0
-        try:
-            cleaned = salary.replace("\u00a0", "").replace("руб.", "").strip()
-            if "-" in cleaned:
-                min_salary, max_salary = map(float, cleaned.split("-"))
-                return max_salary
-            return float(cleaned)
-        except (ValueError, TypeError):
-            return 0.0
 
     @staticmethod
-    def cast_to_object_list(data: List[Dict]) -> List["Vacancy"]:
+    def _parse_salary(salary: Optional[Union[str, Dict]]) -> float:
+        """Обрабатывает зарплату из разных форматов и возвращает минимальное значение или 0"""
+        if not salary:
+            return 0.0
+
+        # Случай: salary — словарь с 'from' и 'to'
+        if isinstance(salary, dict):
+            min_salary = salary.get("from")
+            max_salary = salary.get("to")
+            currency = salary.get("currency", "")
+
+            if min_salary is not None:
+                return float(min_salary)
+            elif max_salary is not None:
+                return float(max_salary)  # Используем 'to' как fallback
+            else:
+                return 0.0
+
+        # Случай: salary — строка
+        if isinstance(salary, str):
+            cleaned = salary.replace("\u00a0", "").strip()
+            if "от" in cleaned:
+                try:
+                    return float(cleaned.replace("от", "").strip().split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+            elif "до" in cleaned:
+                return 0.0  # Зарплата "до" — не подходит для фильтрации по минимуму
+            elif "-" in cleaned:
+                try:
+                    return float(cleaned.split("-")[0].strip().split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+            else:
+                try:
+                    return float(cleaned.split()[0])
+                except (ValueError, IndexError):
+                    return 0.0
+
+        return 0.0
+
+
+    @classmethod
+    def cast_to_object_list(cls, data: List[Dict]) -> List["Vacancy"]:
         """Преобразует сырые данные в список объектов Vacancy"""
         vacancies = []
+
         for item in data:
-            title = item["name"]
-            link = item["alternate_url"]
+            title = item.get("name")
+            link = item.get("alternate_url")
             salary = item.get("salary")
-            salary_str = f"{salary['from']}-{salary['to']} {salary['currency']}" if salary else None
-            description = item["snippet"]["requirement"] or item["snippet"]["responsibility"] or "Описание отсутствует"
-            vacancies.append(Vacancy(title, link, salary_str, description))
+            description = item.get("snippet", {})
+            requirement = description.get("requirement") or description.get("responsibility") or "Описание отсутствует"
+
+            # Пропускаем вакансию, если title или link пустые
+            if not title or not link:
+                continue  # ✅ Пропускаем некорректные вакансии
+
+            try:
+                vacancies.append(cls(title, link, salary, requirement))
+            except ValueError as e:
+                # Можно логировать или игнорировать
+                print(f"Ошибка при инициализации вакансии: {e}")
+                continue
+
         return vacancies
 
     @property
@@ -74,5 +115,13 @@ class Vacancy:
     def __eq__(self, other: "Vacancy") -> bool:
         return self.salary == other.salary
 
+
     def __str__(self) -> str:
-        return f"{self.title}\nСсылка: {self.link}\nЗарплата: {self.salary or 'Не указана'} руб.\nОписание: {self.description[:100]}..."
+        salary_str = f"{int(self.salary)}" if self.salary != 0 else "Не указана"
+        desc_preview = self.description[:100] + "..." if len(self.description) > 100 else self.description
+        return (
+            f"{self.title}\n"
+            f"Ссылка: {self.link}\n"
+            f"Зарплата: {salary_str} руб.\n"
+            f"Описание: {desc_preview}"
+        )
